@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mythos Study System</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>🏛️ Mythos Study System</h1>
+
+<div class="form">
+  <input id="name" placeholder="Name (e.g. Zeus)">
+  <input id="type" placeholder="Type (God/Hero)">
+  <input id="parents" placeholder="Parents (comma separated)">
+  <input id="children" placeholder="Children (comma separated)">
+  <textarea id="notes" placeholder="Notes"></textarea>
+  <button onclick="addCharacter()">Add Character</button>
+</div>
+
+<h2>📚 Characters</h2>
+<div id="characters"></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // 🔥 PASTE YOUR FIREBASE CONFIG HERE
+  const firebaseConfig = {
+    apiKey: "XXXX",
+    authDomain: "XXXX",
+    projectId: "XXXX",
+    storageBucket: "XXXX",
+    messagingSenderId: "XXXX",
+    appId: "XXXX"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // ➕ Add Character
+  async function addCharacter() {
+    const name = document.getElementById("name").value;
+    const type = document.getElementById("type").value;
+    const parents = document.getElementById("parents").value.split(",");
+    const children = document.getElementById("children").value.split(",");
+    const notes = document.getElementById("notes").value;
+
+    await addDoc(collection(db, "characters"), {
+      name,
+      type,
+      parents,
+      children,
+      notes
+    });
+
+    alert("Character saved!");
+    loadCharacters();
+  }
+
+  // 📥 Load Characters
+  async function loadCharacters() {
+    const container = document.getElementById("characters");
+    container.innerHTML = "";
+
+    const querySnapshot = await getDocs(collection(db, "characters"));
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+
+      const div = document.createElement("div");
+      div.className = "card";
+
+      div.innerHTML = `
+        <h3>${data.name}</h3>
+        <p><b>Type:</b> ${data.type}</p>
+        <p><b>Parents:</b> ${data.parents.join(", ")}</p>
+        <p><b>Children:</b> ${data.children.join(", ")}</p>
+        <p>${data.notes}</p>
+      `;
+
+      container.appendChild(div);
+    });
+  }
+
+  window.addCharacter = addCharacter;
+
+  loadCharacters();
+</script>
+
+</body>
+</html>
