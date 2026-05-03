@@ -1428,247 +1428,6 @@
     closeExportModal();
   };
 
-
-  // ===========================
-  // === NOTE TYPES SYSTEM =====
-  // ===========================
-
-  const DEFAULT_NOTE_TYPES = [
-    // ---- Human Nature ----
-    { id:"t_anger", emoji:"🔴", name:"Anger & Conflict Resolution", category:"Human Nature", tag:"theme/anger", obsidianLink:"Anger and Conflict Resolution",
-      template:`# 🔴 Anger & Conflict Resolution\n\n**Tags:** #theme/anger\n**Related:** [[Achilles]] [[Hector]]\n\n---\n\n## Core Idea\n\n\n## Key Examples from the Text\n- \n\n## Quotes\n> \n\n## Analysis\n\n\n## Links to Other Themes\n- [[Mortality and Meaning]]\n- [[Justice Revenge and Forgiveness]]\n` },
-    { id:"t_mortality", emoji:"⚰️", name:"Mortality & Meaning", category:"Human Nature", tag:"theme/mortality", obsidianLink:"Mortality and Meaning",
-      template:`# ⚰️ Mortality & Meaning\n\n**Tags:** #theme/mortality\n\n---\n\n## Core Idea\n\n\n## Key Characters\n- [[Achilles]] — \n- [[Odysseus]] — \n\n## Key Moments\n\n\n## Analysis\n\n` },
-    { id:"t_grief", emoji:"😢", name:"Grief & Loss", category:"Human Nature", tag:"theme/grief", obsidianLink:"Grief and Loss",
-      template:`# 😢 Grief & Loss\n\n**Tags:** #theme/grief\n\n---\n\n## Core Idea\n\n\n## Key Examples\n- \n\n## Quotes\n> \n\n## Analysis\n\n` },
-    { id:"t_cunning", emoji:"🧠", name:"Cunning vs Strength", category:"Human Nature", tag:"theme/cunning", obsidianLink:"Cunning vs Strength",
-      template:`# 🧠 Cunning vs Strength\n\n**Tags:** #theme/cunning\n\n---\n\n## Core Tension\n\n\n## Achilles (Strength)\n- \n\n## Odysseus (Cunning)\n- \n\n## Analysis\n\n` },
-    { id:"t_transform", emoji:"🐷", name:"Transformation & Monstrosity", category:"Human Nature", tag:"theme/transformation", obsidianLink:"Transformation and Monstrosity",
-      template:`# 🐷 Transformation & Monstrosity\n\n**Tags:** #theme/transformation\n\n---\n\n## Core Idea\n\n\n## Key Examples\n- [[Circe]] — \n- \n\n## What Does It Symbolise?\n\n` },
-    // ---- Society & Power ----
-    { id:"t_leadership", emoji:"👑", name:"Leadership & Decision-Making", category:"Society & Power", tag:"theme/leadership", obsidianLink:"Leadership and Decision-Making",
-      template:`# 👑 Leadership & Decision-Making\n\n**Tags:** #theme/leadership\n\n---\n\n## Core Idea\n\n\n## Agamemnon vs Achilles\n- \n\n## Key Decisions & Consequences\n- \n\n## Analysis\n\n` },
-    { id:"t_gender", emoji:"♀️", name:"Gender, Power & Agency", category:"Society & Power", tag:"theme/gender", obsidianLink:"Gender Power and Agency",
-      template:`# ♀️ Gender, Power & Agency\n\n**Tags:** #theme/gender\n\n---\n\n## Core Idea\n\n\n## Female Characters\n- [[Helen]] — \n- [[Penelope]] — \n- [[Andromache]] — \n\n## Analysis\n\n` },
-    { id:"t_hospitality", emoji:"🏛️", name:"Hospitality, Community & Stranger", category:"Society & Power", tag:"theme/hospitality", obsidianLink:"Hospitality Community and Stranger",
-      template:`# 🏛️ Hospitality (Xenia)\n\n**Tags:** #theme/hospitality\n\n---\n\n## What is Xenia?\n\n\n## Examples of Xenia Honoured\n- \n\n## Examples of Xenia Violated\n- \n\n## Consequences\n\n` },
-    { id:"t_time", emoji:"⏳", name:"Time, Patience & Speed", category:"Society & Power", tag:"theme/time", obsidianLink:"Time Patience and Speed",
-      template:`# ⏳ Time, Patience & Speed\n\n**Tags:** #theme/time\n\n---\n\n## Core Idea\n\n\n## Odysseus (Patience)\n- \n\n## Achilles (Urgency)\n- \n\n## Analysis\n\n` },
-    // ---- War & Violence ----
-    { id:"t_war", emoji:"⚔️", name:"War, Trauma & PTSD", category:"War & Violence", tag:"theme/war", obsidianLink:"War Trauma and PTSD",
-      template:`# ⚔️ War, Trauma & PTSD\n\n**Tags:** #theme/war\n\n---\n\n## Core Idea\n\n\n## Modern Lens (PTSD)\n- \n\n## Key Moments\n- \n\n## Quotes\n> \n\n## Analysis\n\n` },
-    // ---- Identity & Relationships ----
-    { id:"t_identity", emoji:"🏠", name:"Identity & Homecoming", category:"Identity & Relationships", tag:"theme/identity", obsidianLink:"Identity and Homecoming",
-      template:`# 🏠 Identity & Homecoming\n\n**Tags:** #theme/identity\n\n---\n\n## Core Idea\n\n\n## Odysseus's Journey Home\n- \n\n## What Is Lost / Regained?\n- \n\n## Analysis\n\n` },
-    { id:"t_loyalty", emoji:"💔", name:"Loyalty, Betrayal & Trust", category:"Identity & Relationships", tag:"theme/loyalty", obsidianLink:"Loyalty Betrayal and Trust",
-      template:`# 💔 Loyalty, Betrayal & Trust\n\n**Tags:** #theme/loyalty\n\n---\n\n## Core Idea\n\n\n## Examples of Loyalty\n- [[Patroclus]] — \n- [[Penelope]] — \n\n## Examples of Betrayal\n- \n\n## Analysis\n\n` },
-    { id:"t_storytelling", emoji:"📖", name:"Storytelling, Memory & Truth", category:"Identity & Relationships", tag:"theme/storytelling", obsidianLink:"Storytelling Memory and Truth",
-      template:`# 📖 Storytelling, Memory & Truth\n\n**Tags:** #theme/storytelling\n\n---\n\n## Core Idea\n\n\n## How Is Memory Used?\n- \n\n## Unreliable Narrators / Distortions\n- \n\n## Analysis\n\n` },
-    { id:"t_fathers", emoji:"👨‍👦", name:"Father–Son Relationships", category:"Identity & Relationships", tag:"theme/fathers-sons", obsidianLink:"Father-Son Relationships",
-      template:`# 👨‍👦 Father–Son Relationships\n\n**Tags:** #theme/fathers-sons\n\n---\n\n## Core Pairs\n- [[Achilles]] & [[Peleus]]\n- [[Telemachus]] & [[Odysseus]]\n- [[Hector]] & [[Priam]]\n\n## Key Moments\n- \n\n## Analysis\n\n` },
-    // ---- Justice & Ethics ----
-    { id:"t_justice", emoji:"⚖️", name:"Justice, Revenge & Forgiveness", category:"Justice & Ethics", tag:"theme/justice", obsidianLink:"Justice Revenge and Forgiveness",
-      template:`# ⚖️ Justice, Revenge & Forgiveness\n\n**Tags:** #theme/justice\n\n---\n\n## Core Tension\n\n\n## Revenge vs Justice\n- [[Achilles]] — \n- [[Odysseus]] — \n\n## Forgiveness Moments\n- \n\n## Analysis\n\n` },
-    // ---- Comparative ----
-    { id:"t_comparative", emoji:"⚔️🌊", name:"Achilles vs Odysseus", category:"Comparative", tag:"theme/comparative", obsidianLink:"Achilles vs Odysseus",
-      template:`# ⚔️🌊 Achilles vs Odysseus\n\n**Tags:** #theme/comparative\n\n---\n\n## Achilles\n- Represents: \n- Key traits: \n- Arc: \n\n## Odysseus\n- Represents: \n- Key traits: \n- Arc: \n\n## Key Differences\n| Dimension | Achilles | Odysseus |\n|---|---|---|\n| Approach | Strength | Cunning |\n| Goal | Glory (κλέος) | Home (νόστος) |\n| Fatal flaw | | |\n\n## Analysis\n\n` },
-    // ---- General types ----
-    { id:"t_character", emoji:"🏛️", name:"Character Study", category:"Characters", tag:"character/study", obsidianLink:"",
-      template:`# 🏛️ Character Study: {{title}}\n\n**Tags:** #character/study\n**Type:** [[Characters]]\n\n---\n\n## Overview\n\n\n## Key Traits\n- \n\n## Role in the Epic\n- \n\n## Key Quotes\n> \n\n## Relationships\n- Parents: \n- Allies: \n- Enemies: \n\n## My Analysis\n\n` },
-    { id:"t_passage", emoji:"📜", name:"Passage Analysis", category:"Close Reading", tag:"analysis/passage", obsidianLink:"",
-      template:`# 📜 Passage Analysis\n\n**Tags:** #analysis/passage\n**Book / Line:** \n\n---\n\n## The Passage\n> \n\n## Context\n\n\n## Literary Devices\n- \n\n## Themes Linked\n- \n\n## My Interpretation\n\n` },
-    { id:"t_essay", emoji:"✍️", name:"Essay Plan", category:"Academic", tag:"academic/essay", obsidianLink:"",
-      template:`# ✍️ Essay Plan\n\n**Tags:** #academic/essay\n**Question:** \n\n---\n\n## Thesis\n\n\n## Argument 1\n- Evidence: \n- Analysis: \n\n## Argument 2\n- Evidence: \n- Analysis: \n\n## Argument 3\n- Evidence: \n- Analysis: \n\n## Conclusion\n\n` },
-  ];
-
-  let noteTypes = JSON.parse(localStorage.getItem("mythos_note_types") || "null") || DEFAULT_NOTE_TYPES;
-
-  function saveNoteTypes() {
-    localStorage.setItem("mythos_note_types", JSON.stringify(noteTypes));
-  }
-
-  function populateNoteTypeDropdown() {
-    const sel = document.getElementById("noteTypeSelect");
-    if (!sel) return;
-    const current = sel.value;
-    sel.innerHTML = '<option value="">📄 General Note</option>';
-    // Group by category
-    const cats = {};
-    noteTypes.forEach(t => { (cats[t.category] = cats[t.category]||[]).push(t); });
-    Object.entries(cats).forEach(([cat, types]) => {
-      const grp = document.createElement("optgroup");
-      grp.label = cat;
-      types.forEach(t => {
-        const opt = document.createElement("option");
-        opt.value = t.id;
-        opt.textContent = `${t.emoji} ${t.name}`;
-        grp.appendChild(opt);
-      });
-      sel.appendChild(grp);
-    });
-    sel.value = current;
-  }
-
-  window.onNoteTypeChange = function() {
-    const sel = document.getElementById("noteTypeSelect");
-    const typeId = sel.value;
-    if (!typeId) return;
-    const type = noteTypes.find(t => t.id === typeId);
-    if (!type) return;
-
-    const body = document.getElementById("noteBody").value.trim();
-    const title = document.getElementById("noteTitleInput").value.trim();
-
-    const confirmApply = !body || confirm("Apply template? This will replace the current note body.");
-    if (!confirmApply) { sel.value = currentNoteType || ""; return; }
-
-    // Fill template placeholders
-    const today = new Date().toISOString().slice(0,10);
-    let filled = type.template
-      .replace(/\{\{title\}\}/g, title || type.name)
-      .replace(/\{\{tag\}\}/g, type.tag)
-      .replace(/\{\{date\}\}/g, today);
-
-    document.getElementById("noteBody").value = filled;
-
-    // Auto-set tags
-    const existingTags = document.getElementById("noteTagsInput").value.trim();
-    if (type.tag && !existingTags.includes(type.tag)) {
-      document.getElementById("noteTagsInput").value = existingTags
-        ? existingTags + ", " + type.tag
-        : type.tag;
-    }
-
-    currentNoteType = typeId;
-    autoSaveNote();
-  };
-
-  let currentNoteType = "";
-
-  // Override openNote to also restore type
-  const _origOpenNote = openNote;
-  function openNote(id) {
-    _origOpenNote(id);
-    const note = notes.find(n => n.id === id);
-    currentNoteType = note ? (note.noteType || "") : "";
-    const sel = document.getElementById("noteTypeSelect");
-    if (sel) sel.value = currentNoteType;
-  }
-
-  // Override autoSaveNote to also save noteType
-  const _origAutoSave = autoSaveNote;
-  function autoSaveNote() {
-    clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(() => {
-      if (!currentNoteId) return;
-      const idx = notes.findIndex(n => n.id === currentNoteId);
-      if (idx === -1) return;
-      notes[idx].title = document.getElementById("noteTitleInput").value || "Untitled";
-      notes[idx].tags = document.getElementById("noteTagsInput").value;
-      notes[idx].body = document.getElementById("noteBody").value;
-      notes[idx].noteType = currentNoteType || "";
-      notes[idx].updated = Date.now();
-      saveNotesToStorage();
-      renderNoteList();
-      updateNoteBacklinks(notes[idx].title);
-      if (previewMode) renderPreview();
-    }, 400);
-  }
-
-  // ===== TEMPLATE MANAGER =====
-  window.openTemplateManager = function() {
-    renderNoteTypeList();
-    document.getElementById("templateManagerModal").style.display = "flex";
-  };
-
-  window.closeTemplateManager = function() {
-    document.getElementById("templateManagerModal").style.display = "none";
-    populateNoteTypeDropdown();
-  };
-
-  function renderNoteTypeList() {
-    const cats = {};
-    noteTypes.forEach(t => { (cats[t.category] = cats[t.category]||[]).push(t); });
-    let html = "";
-    Object.entries(cats).forEach(([cat, types]) => {
-      html += `<div style="color:#a89b8a; font-size:0.72rem; text-transform:uppercase; letter-spacing:1px; margin:10px 0 5px; padding-left:4px;">${cat}</div>`;
-      types.forEach(t => {
-        html += `
-          <div style="background:#1a1a2e; border:1px solid #0f3460; border-radius:10px; padding:11px 14px; display:flex; align-items:center; gap:10px;">
-            <span style="font-size:1.1rem;">${t.emoji}</span>
-            <div style="flex:1;">
-              <div style="color:#e0d7c6; font-size:0.88rem; font-weight:bold;">${t.name}</div>
-              <div style="color:#a89b8a; font-size:0.72rem; margin-top:2px;">#${t.tag}${t.obsidianLink ? " · [["+t.obsidianLink+"]]" : ""}</div>
-            </div>
-            <button onclick="editNoteType('${t.id}')" style="background:#0f3460; color:#e2b96f; border:1px solid #e2b96f; padding:4px 10px; border-radius:6px; cursor:pointer; font-size:0.75rem;">✏️ Edit</button>
-            <button onclick="deleteNoteType('${t.id}')" style="background:transparent; color:#c0392b; border:1px solid #c0392b; padding:4px 8px; border-radius:6px; cursor:pointer; font-size:0.75rem;">🗑</button>
-          </div>`;
-      });
-    });
-    document.getElementById("noteTypeList").innerHTML = html || '<div style="color:#a89b8a; text-align:center; padding:20px;">No types yet.</div>';
-  }
-
-  window.addNoteType = function() {
-    const emoji = document.getElementById("nt_emoji").value.trim() || "📄";
-    const name = document.getElementById("nt_name").value.trim();
-    const category = document.getElementById("nt_category").value.trim() || "General";
-    const tag = document.getElementById("nt_tag").value.trim();
-    const obsidianLink = document.getElementById("nt_obsidian_link").value.trim();
-    const template = document.getElementById("nt_template").value;
-    if (!name) { alert("Please enter a name."); return; }
-    const id = "t_" + name.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"") + "_" + Date.now();
-    noteTypes.push({ id, emoji, name, category, tag, obsidianLink, template });
-    saveNoteTypes();
-    renderNoteTypeList();
-    ["nt_emoji","nt_name","nt_category","nt_tag","nt_obsidian_link","nt_template"].forEach(id => document.getElementById(id).value = "");
-  };
-
-  window.editNoteType = function(id) {
-    const t = noteTypes.find(x => x.id === id);
-    if (!t) return;
-    document.getElementById("edit_nt_id").value = t.id;
-    document.getElementById("edit_nt_emoji").value = t.emoji || "";
-    document.getElementById("edit_nt_name").value = t.name || "";
-    document.getElementById("edit_nt_category").value = t.category || "";
-    document.getElementById("edit_nt_tag").value = t.tag || "";
-    document.getElementById("edit_nt_obsidian_link").value = t.obsidianLink || "";
-    document.getElementById("edit_nt_template").value = t.template || "";
-    document.getElementById("templateEditModal").style.display = "flex";
-  };
-
-  window.closeTemplateEdit = function() {
-    document.getElementById("templateEditModal").style.display = "none";
-  };
-
-  window.saveTemplateEdit = function() {
-    const id = document.getElementById("edit_nt_id").value;
-    const idx = noteTypes.findIndex(x => x.id === id);
-    if (idx === -1) return;
-    noteTypes[idx] = {
-      id,
-      emoji: document.getElementById("edit_nt_emoji").value.trim(),
-      name: document.getElementById("edit_nt_name").value.trim(),
-      category: document.getElementById("edit_nt_category").value.trim(),
-      tag: document.getElementById("edit_nt_tag").value.trim(),
-      obsidianLink: document.getElementById("edit_nt_obsidian_link").value.trim(),
-      template: document.getElementById("edit_nt_template").value
-    };
-    saveNoteTypes();
-    closeTemplateEdit();
-    renderNoteTypeList();
-  };
-
-  window.deleteNoteType = function(id) {
-    if (!confirm("Delete this note type?")) return;
-    noteTypes = noteTypes.filter(t => t.id !== id);
-    saveNoteTypes();
-    renderNoteTypeList();
-  };
-
-  // ===== INIT TYPES =====
-  populateNoteTypeDropdown();
-
-
   initNotes();
 
 
@@ -1691,10 +1450,7 @@
   <!-- SIDEBAR -->
   <div id="notesSidebar" style="width:260px; min-width:220px; background:#16213e; border-right:1px solid #0f3460; display:flex; flex-direction:column; height:100%; overflow:hidden;">
     <div style="padding:14px 14px 10px; border-bottom:1px solid #0f3460;">
-      <div style="display:flex;gap:6px;margin-bottom:2px;">
-        <button onclick="createNote()" style="flex:1; padding:9px; background:#e2b96f; color:#1a1a2e; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">+ New Note</button>
-        <button onclick="openTemplateManager()" title="Manage note types & templates" style="padding:9px 11px; background:#0f3460; color:#e2b96f; border:1px solid #e2b96f; border-radius:8px; cursor:pointer; font-size:0.85rem;">⚙️</button>
-      </div>
+      <button onclick="createNote()" style="width:100%; padding:9px; background:#e2b96f; color:#1a1a2e; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.88rem;">+ New Note</button>
       <input id="noteSearch" placeholder="🔍 Search notes..." oninput="renderNoteList()" autocomplete="off"
         style="width:100%; margin-top:9px; padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.82rem;">
     </div>
@@ -1710,16 +1466,12 @@
 
     <!-- NOTE EDITOR -->
     <div id="noteEditor" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-      <div style="padding:10px 18px; border-bottom:1px solid #0f3460; display:flex; align-items:center; gap:10px; background:#1a1a2e; flex-wrap:wrap;">
+      <div style="padding:12px 18px; border-bottom:1px solid #0f3460; display:flex; align-items:center; gap:10px; background:#1a1a2e;">
         <input id="noteTitleInput" placeholder="Note title..." autocomplete="off"
-          style="flex:1; min-width:140px; background:transparent; border:none; color:#e2b96f; font-size:1.05rem; font-family:Georgia,serif; font-weight:bold; outline:none;"
+          style="flex:1; background:transparent; border:none; color:#e2b96f; font-size:1.05rem; font-family:Georgia,serif; font-weight:bold; outline:none;"
           oninput="autoSaveNote()">
-        <select id="noteTypeSelect" onchange="onNoteTypeChange()"
-          style="background:#16213e; color:#e0d7c6; border:1px solid #0f3460; border-radius:6px; padding:5px 9px; font-size:0.78rem; cursor:pointer; max-width:220px;">
-          <option value="">📄 General Note</option>
-        </select>
         <input id="noteTagsInput" placeholder="#tags" autocomplete="off"
-          style="width:160px; background:#16213e; border:1px solid #0f3460; border-radius:6px; color:#7ec8e3; font-size:0.78rem; padding:5px 9px; outline:none;"
+          style="width:180px; background:#16213e; border:1px solid #0f3460; border-radius:6px; color:#7ec8e3; font-size:0.78rem; padding:5px 9px; outline:none;"
           oninput="autoSaveNote()">
         <button onclick="deleteCurrentNote()" title="Delete note"
           style="background:transparent; border:1px solid #c0392b; color:#c0392b; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.8rem;">🗑</button>
@@ -1842,58 +1594,6 @@
       1. Unzip the downloaded file<br>
       2. Move the folder into your Obsidian vault folder<br>
       3. Open Obsidian → all notes appear with [[links]] intact ✅
-    </div>
-  </div>
-</div>
-
-
-<!-- ===== TEMPLATE MANAGER MODAL ===== -->
-<div id="templateManagerModal" style="display:none; position:fixed; inset:0; background:#000000bb; z-index:1000; align-items:flex-start; justify-content:center; padding-top:40px; overflow-y:auto;">
-  <div style="background:#16213e; border:1px solid #e2b96f; border-radius:18px; padding:26px; max-width:680px; width:93%; position:relative; margin-bottom:40px;">
-    <button onclick="closeTemplateManager()" style="position:absolute;top:14px;right:16px;background:transparent;border:none;color:#a89b8a;font-size:1.3rem;cursor:pointer;">✕</button>
-    <h2 style="color:#e2b96f; margin-bottom:4px; font-size:1.05rem;">⚙️ Note Types & Templates</h2>
-    <p style="color:#a89b8a; font-size:0.78rem; margin-bottom:18px;">Each type has an emoji, name, category, tag, and a markdown template that auto-fills when selected.</p>
-
-    <!-- ADD NEW TYPE FORM -->
-    <div style="background:#1a1a2e; border:1px solid #0f3460; border-radius:12px; padding:16px; margin-bottom:16px;">
-      <div style="color:#e2b96f; font-size:0.82rem; font-weight:bold; margin-bottom:10px;">➕ Add New Type</div>
-      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:8px;">
-        <input id="nt_emoji" placeholder="Emoji e.g. 🔴" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#16213e; color:#e0d7c6; font-size:0.85rem;">
-        <input id="nt_name" placeholder="Name e.g. Anger & Conflict" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#16213e; color:#e0d7c6; font-size:0.85rem;">
-        <input id="nt_category" placeholder="Category e.g. Human Nature" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#16213e; color:#e0d7c6; font-size:0.85rem;">
-      </div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-        <input id="nt_tag" placeholder="Tag e.g. theme/anger" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#16213e; color:#e0d7c6; font-size:0.85rem;">
-        <input id="nt_obsidian_link" placeholder="Obsidian link name (optional)" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#16213e; color:#e0d7c6; font-size:0.85rem;">
-      </div>
-      <textarea id="nt_template" placeholder="Markdown template — use {{title}}, {{tag}}, {{date}} as placeholders" style="width:100%; height:120px; padding:9px 12px; border-radius:8px; border:1px solid #0f3460; background:#16213e; color:#e0d7c6; font-size:0.82rem; font-family:monospace; resize:vertical;"></textarea>
-      <button onclick="addNoteType()" style="margin-top:8px; padding:9px 20px; background:#e2b96f; color:#1a1a2e; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">Save Type</button>
-    </div>
-
-    <!-- EXISTING TYPES LIST -->
-    <div id="noteTypeList" style="display:flex; flex-direction:column; gap:8px;"></div>
-  </div>
-</div>
-
-<!-- TEMPLATE EDIT MODAL -->
-<div id="templateEditModal" style="display:none; position:fixed; inset:0; background:#000000bb; z-index:1001; align-items:center; justify-content:center;">
-  <div style="background:#16213e; border:1px solid #e2b96f; border-radius:16px; padding:24px; max-width:540px; width:92%; position:relative;">
-    <button onclick="closeTemplateEdit()" style="position:absolute;top:12px;right:14px;background:transparent;border:none;color:#a89b8a;font-size:1.2rem;cursor:pointer;">✕</button>
-    <h3 style="color:#e2b96f; margin-bottom:14px; font-size:1rem;">✏️ Edit Note Type</h3>
-    <input type="hidden" id="edit_nt_id">
-    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; margin-bottom:7px;">
-      <input id="edit_nt_emoji" placeholder="Emoji" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.85rem;">
-      <input id="edit_nt_name" placeholder="Name" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.85rem;">
-      <input id="edit_nt_category" placeholder="Category" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.85rem;">
-    </div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:7px;">
-      <input id="edit_nt_tag" placeholder="Tag" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.85rem;">
-      <input id="edit_nt_obsidian_link" placeholder="Obsidian link name" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.85rem;">
-    </div>
-    <textarea id="edit_nt_template" style="width:100%; height:130px; padding:9px 12px; border-radius:8px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.82rem; font-family:monospace; resize:vertical;"></textarea>
-    <div style="display:flex; gap:8px; margin-top:10px;">
-      <button onclick="saveTemplateEdit()" style="flex:1; padding:9px; background:#e2b96f; color:#1a1a2e; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Save Changes</button>
-      <button onclick="closeTemplateEdit()" style="flex:1; padding:9px; background:transparent; color:#a89b8a; border:1px solid #a89b8a; border-radius:8px; cursor:pointer;">Cancel</button>
     </div>
   </div>
 </div>
