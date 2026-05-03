@@ -185,6 +185,7 @@
   <div class="nav-tabs">
     <button class="nav-tab active" id="tab-btn-characters" onclick="switchTab('characters', this)">📚 Characters</button>
     <button class="nav-tab" id="tab-btn-tree" onclick="switchTab('tree', this)">🌳 Family Tree</button>
+    <button class="nav-tab" id="tab-btn-notes" onclick="switchTab('notes', this)">📝 Notes</button>
   </div>
 </header>
 
@@ -644,6 +645,7 @@
           <div class="page-actions">
             <button class="btn-edit" onclick="window.editCharacter('${data.id}')">✏️ Edit</button>
             <button class="btn-delete" onclick="window.deleteCharacter('${data.id}')">🗑️ Delete</button>
+            <button class="btn-edit" onclick="window.exportCharacterMd('${data.name}')">⬇ .md</button>
           </div>
         </div>
       </div>
@@ -944,6 +946,732 @@
 
   loadCharacters();
 
+
+  // ===========================
+  // ===== NOTES SYSTEM ========
+  // ===========================
+
+  let notes = JSON.parse(localStorage.getItem("mythos_notes") || "[]");
+  let currentNoteId = null;
+  let previewMode = false;
+  let autoSaveTimer = null;
+
+  function saveNotesToStorage() {
+    try { localStorage.setItem("mythos_notes", JSON.stringify(notes)); } catch(e) {}
+  }
+
+  function genNoteId() { return "n_" + Date.now() + "_" + Math.random().toString(36).slice(2,7); }
+
+  function createNote() {
+    const note = { id: genNoteId(), title: "Untitled Note", tags: "", body: "", updated: Date.now() };
+    notes.unshift(note);
+    saveNotesToStorage();
+    renderNoteList();
+    openNote(note.id);
+    setTimeout(() => document.getElementById("noteTitleInput").select(), 50);
+  }
+
+  function openNote(id) {
+    currentNoteId = id;
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+    document.getElementById("noteTitleInput").value = note.title || "";
+    document.getElementById("noteTagsInput").value = note.tags || "";
+    document.getElementById("noteBody").value = note.body || "";
+    updateNoteBacklinks(note.title);
+    renderNoteList();
+    if (previewMode) renderPreview();
+  }
+
+  function autoSaveNote() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => {
+      if (!currentNoteId) return;
+      const idx = notes.findIndex(n => n.id === currentNoteId);
+      if (idx === -1) return;
+      notes[idx].title = document.getElementById("noteTitleInput").value || "Untitled";
+      notes[idx].tags = document.getElementById("noteTagsInput").value;
+      notes[idx].body = document.getElementById("noteBody").value;
+      notes[idx].updated = Date.now();
+      saveNotesToStorage();
+      renderNoteList();
+      updateNoteBacklinks(notes[idx].title);
+      if (previewMode) renderPreview();
+    }, 400);
+  }
+
+  function deleteCurrentNote() {
+    if (!currentNoteId) return;
+    if (!confirm("Delete this note?")) return;
+    notes = notes.filter(n => n.id !== currentNoteId);
+    currentNoteId = null;
+    saveNotesToStorage();
+    renderNoteList();
+    document.getElementById("noteTitleInput").value = "";
+    document.getElementById("noteTagsInput").value = "";
+    document.getElementById("noteBody").value = "";
+    document.getElementById("notePreview").innerHTML = "";
+    document.getElementById("noteBacklinksList").textContent = "—";
+    if (notes.length > 0) openNote(notes[0].id);
+  }
+
+  function renderNoteList() {
+    const q = (document.getElementById("noteSearch").value || "").toLowerCase();
+    const filtered = notes.filter(n =>
+      !q || n.title.toLowerCase().includes(q) || (n.body||"").toLowerCase().includes(q) || (n.tags||"").toLowerCase().includes(q)
+    );
+    const container = document.getElementById("noteList");
+    if (!filtered.length) {
+      container.innerHTML = `<div style="color:#a89b8a; font-size:0.82rem; text-align:center; padding:20px;">No notes yet.<br>Click + New Note to start.</div>`;
+      return;
+    }
+    container.innerHTML = filtered.map(note => `
+      <div class="note-item ${note.id === currentNoteId ? "active" : ""}" onclick="openNote('${note.id}')">
+        <div class="note-item-title">${note.title || "Untitled"}</div>
+        <div class="note-item-meta">${note.tags ? note.tags.split(",").map(t => "#"+t.trim()).join(" ") + " · " : ""}${new Date(note.updated).toLocaleDateString()}</div>
+      </div>
+    `).join("");
+  }
+
+  function updateNoteBacklinks(title) {
+    if (!title) return;
+    const refs = notes.filter(n => n.id !== currentNoteId && n.body && n.body.includes("[[" + title + "]]"));
+    const charRefs = allCharacters.filter(c => c.notes && c.notes.includes("[[" + title + "]]"));
+    const all = [
+      ...refs.map(n => `<span class="link" onclick="openNote('${n.id}')">${n.title}</span>`),
+      ...charRefs.map(c => `<span class="link" onclick="window.openCharacterPage('${c.name}')">${c.name}</span>`)
+    ];
+    document.getElementById("noteBacklinksList").innerHTML = all.length ? all.join(" · ") : "—";
+  }
+
+  // ===== MARKDOWN RENDERER =====
+  function renderMarkdown(text) {
+    if (!text) return "";
+    let html = text
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/```([\s\S]*?)```/g, (_, c) => `<pre><code>${c.trim()}</code></pre>`)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+      .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+      .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>")
+      .replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>")
+      .replace(/^- (.+)$/gm, "<li>$1</li>")
+      .replace(/(<li>.*<\/li>)/gs, "<ul>$1</ul>")
+      .replace(/\n\n/g, "</p><p>")
+      .replace(/\n/g, "<br>");
+    // [[links]]
+    html = html.replace(/\[\[([^\]]+)\]\]/g, (_, name) => {
+      const note = notes.find(n => n.title.toLowerCase() === name.toLowerCase());
+      const char = allCharacters.find(c => c.name.toLowerCase() === name.toLowerCase());
+      if (note) return `<span class="note-link" onclick="openNote('${note.id}')">${name}</span>`;
+      if (char) return `<span class="note-link" onclick="window.openCharacterPage('${char.name}')">${name}</span>`;
+      return `<span style="color:#ef9a9a; cursor:pointer;" onclick="createLinkedNote('${name}')" title="Click to create this note">[[${name}]]</span>`;
+    });
+    return "<p>" + html + "</p>";
+  }
+
+  function renderPreview() {
+    const body = document.getElementById("noteBody").value;
+    document.getElementById("notePreview").innerHTML = renderMarkdown(body);
+  }
+
+  window.createLinkedNote = function(title) {
+    const note = { id: genNoteId(), title, tags: "", body: "", updated: Date.now() };
+    notes.unshift(note);
+    saveNotesToStorage();
+    renderNoteList();
+    openNote(note.id);
+  };
+
+  window.togglePreview = function() {
+    previewMode = !previewMode;
+    const ta = document.getElementById("noteBody");
+    const prev = document.getElementById("notePreview");
+    const btn = document.getElementById("modeBtn");
+    if (previewMode) {
+      renderPreview();
+      ta.style.display = "none";
+      prev.style.display = "block";
+      btn.textContent = "✏️ Edit";
+      btn.classList.add("tb-btn-active");
+    } else {
+      ta.style.display = "block";
+      prev.style.display = "none";
+      btn.textContent = "👁 Preview";
+    }
+  };
+
+  window.insertMd = function(before, after) {
+    const ta = document.getElementById("noteBody");
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    const sel = ta.value.slice(start, end);
+    ta.value = ta.value.slice(0, start) + before + sel + after + ta.value.slice(end);
+    ta.selectionStart = start + before.length;
+    ta.selectionEnd = start + before.length + sel.length;
+    ta.focus();
+    autoSaveNote();
+  };
+
+  // ===== GRAPH VIEW =====
+  let graphNetwork = null;
+
+  window.showGraphView = function() {
+    document.getElementById("noteEditor").style.display = "none";
+    const gv = document.getElementById("graphView");
+    gv.style.display = "flex";
+    renderGraph();
+  };
+
+  window.hideGraphView = function() {
+    document.getElementById("graphView").style.display = "none";
+    document.getElementById("noteEditor").style.display = "flex";
+  };
+
+  function renderGraph() {
+    const canvas = document.getElementById("graphCanvas");
+    canvas.innerHTML = "";
+
+    // Collect all nodes: notes + characters
+    const nodeMap = {};
+    const edges = [];
+
+    // Add note nodes
+    notes.forEach(n => {
+      nodeMap[n.title] = { id: n.title, label: n.title, type: "note", noteId: n.id };
+    });
+    // Add character nodes
+    allCharacters.forEach(c => {
+      if (!nodeMap[c.name]) nodeMap[c.name] = { id: c.name, label: c.name, type: "char", charName: c.name };
+    });
+
+    // Collect [[links]] from notes
+    const linkSet = new Set();
+    notes.forEach(n => {
+      const matches = (n.body||"").match(/\[\[([^\]]+)\]\]/g) || [];
+      matches.forEach(m => {
+        const target = m.slice(2,-2);
+        if (target !== n.title) {
+          const key = n.title + "→" + target;
+          if (!linkSet.has(key)) { linkSet.add(key); edges.push({ from: n.title, to: target }); }
+          if (!nodeMap[target]) nodeMap[target] = { id: target, label: target, type: "ghost" };
+        }
+      });
+    });
+    // Links from character notes to other characters/notes
+    allCharacters.forEach(c => {
+      const matches = (c.notes||"").match(/\[\[([^\]]+)\]\]/g) || [];
+      matches.forEach(m => {
+        const target = m.slice(2,-2);
+        if (target !== c.name) {
+          const key = c.name + "→" + target;
+          if (!linkSet.has(key)) { linkSet.add(key); edges.push({ from: c.name, to: target }); }
+          if (!nodeMap[target]) nodeMap[target] = { id: target, label: target, type: "ghost" };
+        }
+      });
+    });
+
+    const nodes = Object.values(nodeMap);
+    if (!nodes.length) {
+      canvas.innerHTML = `<div style="color:#a89b8a; text-align:center; padding-top:80px; font-size:0.9rem;">No notes yet.<br>Create notes and use [[links]] to build the graph.</div>`;
+      return;
+    }
+
+    // Build vis-network graph
+    const visNodes = nodes.map(n => ({
+      id: n.id,
+      label: n.label,
+      color: {
+        background: n.type === "char" ? "#4fc3f7" : n.type === "ghost" ? "#3a3a4a" : "#e2b96f",
+        border: n.type === "ghost" ? "#555" : "#1a1a2e",
+        highlight: { background: "#e2b96f", border: "#fff" }
+      },
+      font: { color: "#ffffff", size: 13, face: "Arial", bold: true, strokeWidth: 2, strokeColor: "#000" },
+      size: n.type === "ghost" ? 12 : 18,
+      shape: n.type === "char" ? "dot" : "dot",
+      title: n.type === "char" ? "Character: " + n.label : "Note: " + n.label
+    }));
+
+    const visEdges = edges.filter(e => nodeMap[e.from] && nodeMap[e.to]).map(e => ({
+      from: e.from, to: e.to,
+      color: { color: "#e2b96f55", opacity: 0.6 },
+      width: 1,
+      smooth: { type: "continuous" }
+    }));
+
+    if (graphNetwork) { graphNetwork.destroy(); graphNetwork = null; }
+    graphNetwork = new vis.Network(
+      canvas,
+      { nodes: new vis.DataSet(visNodes), edges: new vis.DataSet(visEdges) },
+      {
+        layout: { randomSeed: 42 },
+        physics: { solver: "forceAtlas2Based", forceAtlas2Based: { gravitationalConstant: -40, springLength: 100 }, stabilization: { iterations: 150 } },
+        interaction: { zoomView: true, dragView: true, hover: true, tooltipDelay: 150 },
+        nodes: { margin: 8 }
+      }
+    );
+
+    graphNetwork.on("click", params => {
+      if (!params.nodes.length) return;
+      const clicked = params.nodes[0];
+      const node = nodeMap[clicked];
+      if (!node) return;
+      if (node.type === "char") { window.openCharacterPage(node.charName); return; }
+      if (node.noteId) { hideGraphView(); openNote(node.noteId); }
+      else if (node.type === "ghost") { hideGraphView(); createLinkedNote(clicked); }
+    });
+  }
+
+  // ===== INIT NOTES =====
+  function initNotes() {
+    renderNoteList();
+    if (notes.length > 0) openNote(notes[0].id);
+  }
+
+  // Patch switchTab to handle notes
+  const _origSwitchTab = window.switchTab;
+  window.switchTab = function(tab, btn) {
+    document.querySelectorAll(".view").forEach(v => {
+      v.classList.remove("active");
+      v.style.display = "none";
+    });
+    document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
+    const el = document.getElementById("tab-" + tab);
+    if (el) {
+      el.style.display = tab === "notes" ? "flex" : "block";
+      el.classList.add("active");
+    }
+    btn.classList.add("active");
+    if (tab === "tree") loadAndBuildTree();
+    if (tab === "notes") initNotes();
+    if (tab === "characters") {
+      document.getElementById("listView").style.display = "block";
+      loadCharacters();
+    }
+  };
+
+
+  // ===========================
+  // ===== EXPORT SYSTEM =======
+  // ===========================
+
+  window.showExportModal = function() {
+    document.getElementById("exportNoteCount").textContent = notes.length + " notes in storage";
+    document.getElementById("exportCharCount").textContent = allCharacters.length + " characters in Firebase";
+    document.getElementById("exportModal").style.display = "flex";
+  };
+
+  window.closeExportModal = function() {
+    document.getElementById("exportModal").style.display = "none";
+  };
+
+  // --- Format a note as Obsidian markdown ---
+  function noteToMarkdown(note) {
+    const tags = (note.tags||"").split(",").map(t=>t.trim()).filter(Boolean);
+    const frontmatter = [
+      "---",
+      `title: "${note.title || "Untitled"}"`,
+      `updated: "${new Date(note.updated||Date.now()).toISOString().slice(0,10)}"`,
+      tags.length ? `tags: [${tags.map(t=>'"'+t+'"').join(", ")}]` : "",
+      "---"
+    ].filter(Boolean).join("\n");
+    return frontmatter + "\n\n" + (note.body || "");
+  }
+
+  // --- Format a character as Obsidian markdown ---
+  function characterToMarkdown(c) {
+    const tags = (c.tags||[]);
+    const frontmatter = [
+      "---",
+      `title: "${c.name}"`,
+      `type: "${c.type||""}"`,
+      tags.length ? `tags: [${tags.map(t=>'"'+t+'"').join(", ")}]` : "",
+      c.image ? `image: "${c.image}"` : "",
+      "---"
+    ].filter(Boolean).join("\n");
+
+    function relSection(heading, items, isComplicated=false) {
+      if (!items || !items.length) return "";
+      if (isComplicated) return `\n## ${heading}\n` + items.map(x => `- [[${x.name}]]${x.note ? " — *"+x.note+"*" : ""}`).join("\n");
+      return `\n## ${heading}\n` + items.map(n => `- [[${n}]]`).join("\n");
+    }
+
+    const body = [
+      `# ${c.name}`,
+      "",
+      relSection("Parents", c.parents),
+      relSection("Children", c.children),
+      relSection("Siblings", c.siblings),
+      relSection("Spouse / Partner", c.spouse),
+      relSection("Other Relatives", c.relatives),
+      relSection("Friends & Allies", c.friends),
+      relSection("Enemies", c.enemies),
+      relSection("Complicated Relationships", c.complicated, true),
+      c.notes ? `\n## Notes\n\n${c.notes}` : ""
+    ].filter(s => s !== undefined && s !== "").join("\n");
+
+    return frontmatter + "\n\n" + body;
+  }
+
+  function safeName(name) {
+    return (name||"Untitled").replace(/[/\\?%*:|"<>]/g, "-").trim();
+  }
+
+  function downloadFile(filename, content) {
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // --- Single note export ---
+  window.exportCurrentNote = function() {
+    if (!currentNoteId) { alert("Open a note first."); return; }
+    const note = notes.find(n => n.id === currentNoteId);
+    if (!note) return;
+    downloadFile(safeName(note.title) + ".md", noteToMarkdown(note));
+  };
+
+  // --- Export single character from page view ---
+  window.exportCharacterMd = function(name) {
+    const c = allCharacters.find(x => x.name === name);
+    if (!c) return;
+    downloadFile(safeName(c.name) + ".md", characterToMarkdown(c));
+  };
+
+  // --- Export all notes (one by one) ---
+  window.exportAllNotes = function() {
+    if (!notes.length) { alert("No notes to export."); return; }
+    notes.forEach((note, i) => {
+      setTimeout(() => downloadFile(safeName(note.title) + ".md", noteToMarkdown(note)), i * 120);
+    });
+    closeExportModal();
+  };
+
+  // --- Export all characters (one by one) ---
+  window.exportAllCharacters = function() {
+    if (!allCharacters.length) { alert("No characters loaded. Go to Characters tab first."); return; }
+    allCharacters.forEach((c, i) => {
+      setTimeout(() => downloadFile(safeName(c.name) + ".md", characterToMarkdown(c)), i * 120);
+    });
+    closeExportModal();
+  };
+
+  // ---- JSZip-based ZIP exports ----
+  async function loadJSZip() {
+    if (window.JSZip) return window.JSZip;
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+      s.onload = () => resolve(window.JSZip);
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  async function downloadZip(zip, filename) {
+    const blob = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  window.exportNoteZip = async function() {
+    if (!notes.length) { alert("No notes to export."); return; }
+    const JSZip = await loadJSZip();
+    const zip = new JSZip();
+    const folder = zip.folder("Mythos Notes");
+    notes.forEach(note => folder.file(safeName(note.title) + ".md", noteToMarkdown(note)));
+    await downloadZip(zip, "Mythos-Notes.zip");
+    closeExportModal();
+  };
+
+  window.exportCharZip = async function() {
+    if (!allCharacters.length) { alert("No characters. Visit Characters tab first."); return; }
+    const JSZip = await loadJSZip();
+    const zip = new JSZip();
+    const folder = zip.folder("Mythos Characters");
+    allCharacters.forEach(c => folder.file(safeName(c.name) + ".md", characterToMarkdown(c)));
+    await downloadZip(zip, "Mythos-Characters.zip");
+    closeExportModal();
+  };
+
+  window.exportFullVault = async function() {
+    if (!notes.length && !allCharacters.length) { alert("Nothing to export yet."); return; }
+    const JSZip = await loadJSZip();
+    const zip = new JSZip();
+    if (notes.length) {
+      const nf = zip.folder("Notes");
+      notes.forEach(note => nf.file(safeName(note.title) + ".md", noteToMarkdown(note)));
+    }
+    if (allCharacters.length) {
+      const cf = zip.folder("Characters");
+      allCharacters.forEach(c => cf.file(safeName(c.name) + ".md", characterToMarkdown(c)));
+    }
+    // Add a vault index file
+    const index = [
+      "# Mythos Vault Index",
+      "",
+      "## Characters",
+      ...allCharacters.map(c => `- [[${c.name}]]`),
+      "",
+      "## Notes",
+      ...notes.map(n => `- [[${n.title}]]`)
+    ].join("\n");
+    zip.file("_Index.md", index);
+    await downloadZip(zip, "Mythos-Vault.zip");
+    closeExportModal();
+  };
+
+
+  // ===========================
+  // === NOTE TYPES SYSTEM =====
+  // ===========================
+
+  const DEFAULT_NOTE_TYPES = [
+    // ---- Human Nature ----
+    { id:"t_anger", emoji:"🔴", name:"Anger & Conflict Resolution", category:"Human Nature", tag:"theme/anger", obsidianLink:"Anger and Conflict Resolution",
+      template:`# 🔴 Anger & Conflict Resolution\n\n**Tags:** #theme/anger\n**Related:** [[Achilles]] [[Hector]]\n\n---\n\n## Core Idea\n\n\n## Key Examples from the Text\n- \n\n## Quotes\n> \n\n## Analysis\n\n\n## Links to Other Themes\n- [[Mortality and Meaning]]\n- [[Justice Revenge and Forgiveness]]\n` },
+    { id:"t_mortality", emoji:"⚰️", name:"Mortality & Meaning", category:"Human Nature", tag:"theme/mortality", obsidianLink:"Mortality and Meaning",
+      template:`# ⚰️ Mortality & Meaning\n\n**Tags:** #theme/mortality\n\n---\n\n## Core Idea\n\n\n## Key Characters\n- [[Achilles]] — \n- [[Odysseus]] — \n\n## Key Moments\n\n\n## Analysis\n\n` },
+    { id:"t_grief", emoji:"😢", name:"Grief & Loss", category:"Human Nature", tag:"theme/grief", obsidianLink:"Grief and Loss",
+      template:`# 😢 Grief & Loss\n\n**Tags:** #theme/grief\n\n---\n\n## Core Idea\n\n\n## Key Examples\n- \n\n## Quotes\n> \n\n## Analysis\n\n` },
+    { id:"t_cunning", emoji:"🧠", name:"Cunning vs Strength", category:"Human Nature", tag:"theme/cunning", obsidianLink:"Cunning vs Strength",
+      template:`# 🧠 Cunning vs Strength\n\n**Tags:** #theme/cunning\n\n---\n\n## Core Tension\n\n\n## Achilles (Strength)\n- \n\n## Odysseus (Cunning)\n- \n\n## Analysis\n\n` },
+    { id:"t_transform", emoji:"🐷", name:"Transformation & Monstrosity", category:"Human Nature", tag:"theme/transformation", obsidianLink:"Transformation and Monstrosity",
+      template:`# 🐷 Transformation & Monstrosity\n\n**Tags:** #theme/transformation\n\n---\n\n## Core Idea\n\n\n## Key Examples\n- [[Circe]] — \n- \n\n## What Does It Symbolise?\n\n` },
+    // ---- Society & Power ----
+    { id:"t_leadership", emoji:"👑", name:"Leadership & Decision-Making", category:"Society & Power", tag:"theme/leadership", obsidianLink:"Leadership and Decision-Making",
+      template:`# 👑 Leadership & Decision-Making\n\n**Tags:** #theme/leadership\n\n---\n\n## Core Idea\n\n\n## Agamemnon vs Achilles\n- \n\n## Key Decisions & Consequences\n- \n\n## Analysis\n\n` },
+    { id:"t_gender", emoji:"♀️", name:"Gender, Power & Agency", category:"Society & Power", tag:"theme/gender", obsidianLink:"Gender Power and Agency",
+      template:`# ♀️ Gender, Power & Agency\n\n**Tags:** #theme/gender\n\n---\n\n## Core Idea\n\n\n## Female Characters\n- [[Helen]] — \n- [[Penelope]] — \n- [[Andromache]] — \n\n## Analysis\n\n` },
+    { id:"t_hospitality", emoji:"🏛️", name:"Hospitality, Community & Stranger", category:"Society & Power", tag:"theme/hospitality", obsidianLink:"Hospitality Community and Stranger",
+      template:`# 🏛️ Hospitality (Xenia)\n\n**Tags:** #theme/hospitality\n\n---\n\n## What is Xenia?\n\n\n## Examples of Xenia Honoured\n- \n\n## Examples of Xenia Violated\n- \n\n## Consequences\n\n` },
+    { id:"t_time", emoji:"⏳", name:"Time, Patience & Speed", category:"Society & Power", tag:"theme/time", obsidianLink:"Time Patience and Speed",
+      template:`# ⏳ Time, Patience & Speed\n\n**Tags:** #theme/time\n\n---\n\n## Core Idea\n\n\n## Odysseus (Patience)\n- \n\n## Achilles (Urgency)\n- \n\n## Analysis\n\n` },
+    // ---- War & Violence ----
+    { id:"t_war", emoji:"⚔️", name:"War, Trauma & PTSD", category:"War & Violence", tag:"theme/war", obsidianLink:"War Trauma and PTSD",
+      template:`# ⚔️ War, Trauma & PTSD\n\n**Tags:** #theme/war\n\n---\n\n## Core Idea\n\n\n## Modern Lens (PTSD)\n- \n\n## Key Moments\n- \n\n## Quotes\n> \n\n## Analysis\n\n` },
+    // ---- Identity & Relationships ----
+    { id:"t_identity", emoji:"🏠", name:"Identity & Homecoming", category:"Identity & Relationships", tag:"theme/identity", obsidianLink:"Identity and Homecoming",
+      template:`# 🏠 Identity & Homecoming\n\n**Tags:** #theme/identity\n\n---\n\n## Core Idea\n\n\n## Odysseus's Journey Home\n- \n\n## What Is Lost / Regained?\n- \n\n## Analysis\n\n` },
+    { id:"t_loyalty", emoji:"💔", name:"Loyalty, Betrayal & Trust", category:"Identity & Relationships", tag:"theme/loyalty", obsidianLink:"Loyalty Betrayal and Trust",
+      template:`# 💔 Loyalty, Betrayal & Trust\n\n**Tags:** #theme/loyalty\n\n---\n\n## Core Idea\n\n\n## Examples of Loyalty\n- [[Patroclus]] — \n- [[Penelope]] — \n\n## Examples of Betrayal\n- \n\n## Analysis\n\n` },
+    { id:"t_storytelling", emoji:"📖", name:"Storytelling, Memory & Truth", category:"Identity & Relationships", tag:"theme/storytelling", obsidianLink:"Storytelling Memory and Truth",
+      template:`# 📖 Storytelling, Memory & Truth\n\n**Tags:** #theme/storytelling\n\n---\n\n## Core Idea\n\n\n## How Is Memory Used?\n- \n\n## Unreliable Narrators / Distortions\n- \n\n## Analysis\n\n` },
+    { id:"t_fathers", emoji:"👨‍👦", name:"Father–Son Relationships", category:"Identity & Relationships", tag:"theme/fathers-sons", obsidianLink:"Father-Son Relationships",
+      template:`# 👨‍👦 Father–Son Relationships\n\n**Tags:** #theme/fathers-sons\n\n---\n\n## Core Pairs\n- [[Achilles]] & [[Peleus]]\n- [[Telemachus]] & [[Odysseus]]\n- [[Hector]] & [[Priam]]\n\n## Key Moments\n- \n\n## Analysis\n\n` },
+    // ---- Justice & Ethics ----
+    { id:"t_justice", emoji:"⚖️", name:"Justice, Revenge & Forgiveness", category:"Justice & Ethics", tag:"theme/justice", obsidianLink:"Justice Revenge and Forgiveness",
+      template:`# ⚖️ Justice, Revenge & Forgiveness\n\n**Tags:** #theme/justice\n\n---\n\n## Core Tension\n\n\n## Revenge vs Justice\n- [[Achilles]] — \n- [[Odysseus]] — \n\n## Forgiveness Moments\n- \n\n## Analysis\n\n` },
+    // ---- Comparative ----
+    { id:"t_comparative", emoji:"⚔️🌊", name:"Achilles vs Odysseus", category:"Comparative", tag:"theme/comparative", obsidianLink:"Achilles vs Odysseus",
+      template:`# ⚔️🌊 Achilles vs Odysseus\n\n**Tags:** #theme/comparative\n\n---\n\n## Achilles\n- Represents: \n- Key traits: \n- Arc: \n\n## Odysseus\n- Represents: \n- Key traits: \n- Arc: \n\n## Key Differences\n| Dimension | Achilles | Odysseus |\n|---|---|---|\n| Approach | Strength | Cunning |\n| Goal | Glory (κλέος) | Home (νόστος) |\n| Fatal flaw | | |\n\n## Analysis\n\n` },
+    // ---- General types ----
+    { id:"t_character", emoji:"🏛️", name:"Character Study", category:"Characters", tag:"character/study", obsidianLink:"",
+      template:`# 🏛️ Character Study: {{title}}\n\n**Tags:** #character/study\n**Type:** [[Characters]]\n\n---\n\n## Overview\n\n\n## Key Traits\n- \n\n## Role in the Epic\n- \n\n## Key Quotes\n> \n\n## Relationships\n- Parents: \n- Allies: \n- Enemies: \n\n## My Analysis\n\n` },
+    { id:"t_passage", emoji:"📜", name:"Passage Analysis", category:"Close Reading", tag:"analysis/passage", obsidianLink:"",
+      template:`# 📜 Passage Analysis\n\n**Tags:** #analysis/passage\n**Book / Line:** \n\n---\n\n## The Passage\n> \n\n## Context\n\n\n## Literary Devices\n- \n\n## Themes Linked\n- \n\n## My Interpretation\n\n` },
+    { id:"t_essay", emoji:"✍️", name:"Essay Plan", category:"Academic", tag:"academic/essay", obsidianLink:"",
+      template:`# ✍️ Essay Plan\n\n**Tags:** #academic/essay\n**Question:** \n\n---\n\n## Thesis\n\n\n## Argument 1\n- Evidence: \n- Analysis: \n\n## Argument 2\n- Evidence: \n- Analysis: \n\n## Argument 3\n- Evidence: \n- Analysis: \n\n## Conclusion\n\n` },
+  ];
+
+  let noteTypes = JSON.parse(localStorage.getItem("mythos_note_types") || "null") || DEFAULT_NOTE_TYPES;
+
+  function saveNoteTypes() {
+    localStorage.setItem("mythos_note_types", JSON.stringify(noteTypes));
+  }
+
+  function populateNoteTypeDropdown() {
+    const sel = document.getElementById("noteTypeSelect");
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">📄 General Note</option>';
+    // Group by category
+    const cats = {};
+    noteTypes.forEach(t => { (cats[t.category] = cats[t.category]||[]).push(t); });
+    Object.entries(cats).forEach(([cat, types]) => {
+      const grp = document.createElement("optgroup");
+      grp.label = cat;
+      types.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t.id;
+        opt.textContent = `${t.emoji} ${t.name}`;
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    });
+    sel.value = current;
+  }
+
+  window.onNoteTypeChange = function() {
+    const sel = document.getElementById("noteTypeSelect");
+    const typeId = sel.value;
+    if (!typeId) return;
+    const type = noteTypes.find(t => t.id === typeId);
+    if (!type) return;
+
+    const body = document.getElementById("noteBody").value.trim();
+    const title = document.getElementById("noteTitleInput").value.trim();
+
+    const confirmApply = !body || confirm("Apply template? This will replace the current note body.");
+    if (!confirmApply) { sel.value = currentNoteType || ""; return; }
+
+    // Fill template placeholders
+    const today = new Date().toISOString().slice(0,10);
+    let filled = type.template
+      .replace(/\{\{title\}\}/g, title || type.name)
+      .replace(/\{\{tag\}\}/g, type.tag)
+      .replace(/\{\{date\}\}/g, today);
+
+    document.getElementById("noteBody").value = filled;
+
+    // Auto-set tags
+    const existingTags = document.getElementById("noteTagsInput").value.trim();
+    if (type.tag && !existingTags.includes(type.tag)) {
+      document.getElementById("noteTagsInput").value = existingTags
+        ? existingTags + ", " + type.tag
+        : type.tag;
+    }
+
+    currentNoteType = typeId;
+    autoSaveNote();
+  };
+
+  let currentNoteType = "";
+
+  // Override openNote to also restore type
+  const _origOpenNote = openNote;
+  function openNote(id) {
+    _origOpenNote(id);
+    const note = notes.find(n => n.id === id);
+    currentNoteType = note ? (note.noteType || "") : "";
+    const sel = document.getElementById("noteTypeSelect");
+    if (sel) sel.value = currentNoteType;
+  }
+
+  // Override autoSaveNote to also save noteType
+  const _origAutoSave = autoSaveNote;
+  function autoSaveNote() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => {
+      if (!currentNoteId) return;
+      const idx = notes.findIndex(n => n.id === currentNoteId);
+      if (idx === -1) return;
+      notes[idx].title = document.getElementById("noteTitleInput").value || "Untitled";
+      notes[idx].tags = document.getElementById("noteTagsInput").value;
+      notes[idx].body = document.getElementById("noteBody").value;
+      notes[idx].noteType = currentNoteType || "";
+      notes[idx].updated = Date.now();
+      saveNotesToStorage();
+      renderNoteList();
+      updateNoteBacklinks(notes[idx].title);
+      if (previewMode) renderPreview();
+    }, 400);
+  }
+
+  // ===== TEMPLATE MANAGER =====
+  window.openTemplateManager = function() {
+    renderNoteTypeList();
+    document.getElementById("templateManagerModal").style.display = "flex";
+  };
+
+  window.closeTemplateManager = function() {
+    document.getElementById("templateManagerModal").style.display = "none";
+    populateNoteTypeDropdown();
+  };
+
+  function renderNoteTypeList() {
+    const cats = {};
+    noteTypes.forEach(t => { (cats[t.category] = cats[t.category]||[]).push(t); });
+    let html = "";
+    Object.entries(cats).forEach(([cat, types]) => {
+      html += `<div style="color:#a89b8a; font-size:0.72rem; text-transform:uppercase; letter-spacing:1px; margin:10px 0 5px; padding-left:4px;">${cat}</div>`;
+      types.forEach(t => {
+        html += `
+          <div style="background:#1a1a2e; border:1px solid #0f3460; border-radius:10px; padding:11px 14px; display:flex; align-items:center; gap:10px;">
+            <span style="font-size:1.1rem;">${t.emoji}</span>
+            <div style="flex:1;">
+              <div style="color:#e0d7c6; font-size:0.88rem; font-weight:bold;">${t.name}</div>
+              <div style="color:#a89b8a; font-size:0.72rem; margin-top:2px;">#${t.tag}${t.obsidianLink ? " · [["+t.obsidianLink+"]]" : ""}</div>
+            </div>
+            <button onclick="editNoteType('${t.id}')" style="background:#0f3460; color:#e2b96f; border:1px solid #e2b96f; padding:4px 10px; border-radius:6px; cursor:pointer; font-size:0.75rem;">✏️ Edit</button>
+            <button onclick="deleteNoteType('${t.id}')" style="background:transparent; color:#c0392b; border:1px solid #c0392b; padding:4px 8px; border-radius:6px; cursor:pointer; font-size:0.75rem;">🗑</button>
+          </div>`;
+      });
+    });
+    document.getElementById("noteTypeList").innerHTML = html || '<div style="color:#a89b8a; text-align:center; padding:20px;">No types yet.</div>';
+  }
+
+  window.addNoteType = function() {
+    const emoji = document.getElementById("nt_emoji").value.trim() || "📄";
+    const name = document.getElementById("nt_name").value.trim();
+    const category = document.getElementById("nt_category").value.trim() || "General";
+    const tag = document.getElementById("nt_tag").value.trim();
+    const obsidianLink = document.getElementById("nt_obsidian_link").value.trim();
+    const template = document.getElementById("nt_template").value;
+    if (!name) { alert("Please enter a name."); return; }
+    const id = "t_" + name.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"") + "_" + Date.now();
+    noteTypes.push({ id, emoji, name, category, tag, obsidianLink, template });
+    saveNoteTypes();
+    renderNoteTypeList();
+    ["nt_emoji","nt_name","nt_category","nt_tag","nt_obsidian_link","nt_template"].forEach(id => document.getElementById(id).value = "");
+  };
+
+  window.editNoteType = function(id) {
+    const t = noteTypes.find(x => x.id === id);
+    if (!t) return;
+    document.getElementById("edit_nt_id").value = t.id;
+    document.getElementById("edit_nt_emoji").value = t.emoji || "";
+    document.getElementById("edit_nt_name").value = t.name || "";
+    document.getElementById("edit_nt_category").value = t.category || "";
+    document.getElementById("edit_nt_tag").value = t.tag || "";
+    document.getElementById("edit_nt_obsidian_link").value = t.obsidianLink || "";
+    document.getElementById("edit_nt_template").value = t.template || "";
+    document.getElementById("templateEditModal").style.display = "flex";
+  };
+
+  window.closeTemplateEdit = function() {
+    document.getElementById("templateEditModal").style.display = "none";
+  };
+
+  window.saveTemplateEdit = function() {
+    const id = document.getElementById("edit_nt_id").value;
+    const idx = noteTypes.findIndex(x => x.id === id);
+    if (idx === -1) return;
+    noteTypes[idx] = {
+      id,
+      emoji: document.getElementById("edit_nt_emoji").value.trim(),
+      name: document.getElementById("edit_nt_name").value.trim(),
+      category: document.getElementById("edit_nt_category").value.trim(),
+      tag: document.getElementById("edit_nt_tag").value.trim(),
+      obsidianLink: document.getElementById("edit_nt_obsidian_link").value.trim(),
+      template: document.getElementById("edit_nt_template").value
+    };
+    saveNoteTypes();
+    closeTemplateEdit();
+    renderNoteTypeList();
+  };
+
+  window.deleteNoteType = function(id) {
+    if (!confirm("Delete this note type?")) return;
+    noteTypes = noteTypes.filter(t => t.id !== id);
+    saveNoteTypes();
+    renderNoteTypeList();
+  };
+
+  // ===== INIT TYPES =====
+  populateNoteTypeDropdown();
+
+
+  initNotes();
+
+
   window.toggleLegend = function() {
     const panel = document.getElementById("legendPanel");
     const btn = event.target;
@@ -956,5 +1684,219 @@
     }
   };
 </script>
+
+<!-- ===== NOTES TAB ===== -->
+<div id="tab-notes" class="view" style="padding:0; height:calc(100vh - 60px); flex-direction:row;">
+
+  <!-- SIDEBAR -->
+  <div id="notesSidebar" style="width:260px; min-width:220px; background:#16213e; border-right:1px solid #0f3460; display:flex; flex-direction:column; height:100%; overflow:hidden;">
+    <div style="padding:14px 14px 10px; border-bottom:1px solid #0f3460;">
+      <div style="display:flex;gap:6px;margin-bottom:2px;">
+        <button onclick="createNote()" style="flex:1; padding:9px; background:#e2b96f; color:#1a1a2e; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">+ New Note</button>
+        <button onclick="openTemplateManager()" title="Manage note types & templates" style="padding:9px 11px; background:#0f3460; color:#e2b96f; border:1px solid #e2b96f; border-radius:8px; cursor:pointer; font-size:0.85rem;">⚙️</button>
+      </div>
+      <input id="noteSearch" placeholder="🔍 Search notes..." oninput="renderNoteList()" autocomplete="off"
+        style="width:100%; margin-top:9px; padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.82rem;">
+    </div>
+    <div id="noteList" style="flex:1; overflow-y:auto; padding:8px 6px;"></div>
+    <div style="padding:10px 14px; border-top:1px solid #0f3460; display:flex; flex-direction:column; gap:7px;">
+      <button onclick="showGraphView()" style="width:100%; padding:7px; background:#0f3460; color:#e2b96f; border:1px solid #e2b96f; border-radius:8px; cursor:pointer; font-size:0.82rem;">🕸 Graph View</button>
+      <button onclick="showExportModal()" style="width:100%; padding:7px; background:#1a1a2e; color:#a89b8a; border:1px solid #0f3460; border-radius:8px; cursor:pointer; font-size:0.82rem;">📦 Export All</button>
+    </div>
+  </div>
+
+  <!-- EDITOR AREA -->
+  <div id="notesMain" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+
+    <!-- NOTE EDITOR -->
+    <div id="noteEditor" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+      <div style="padding:10px 18px; border-bottom:1px solid #0f3460; display:flex; align-items:center; gap:10px; background:#1a1a2e; flex-wrap:wrap;">
+        <input id="noteTitleInput" placeholder="Note title..." autocomplete="off"
+          style="flex:1; min-width:140px; background:transparent; border:none; color:#e2b96f; font-size:1.05rem; font-family:Georgia,serif; font-weight:bold; outline:none;"
+          oninput="autoSaveNote()">
+        <select id="noteTypeSelect" onchange="onNoteTypeChange()"
+          style="background:#16213e; color:#e0d7c6; border:1px solid #0f3460; border-radius:6px; padding:5px 9px; font-size:0.78rem; cursor:pointer; max-width:220px;">
+          <option value="">📄 General Note</option>
+        </select>
+        <input id="noteTagsInput" placeholder="#tags" autocomplete="off"
+          style="width:160px; background:#16213e; border:1px solid #0f3460; border-radius:6px; color:#7ec8e3; font-size:0.78rem; padding:5px 9px; outline:none;"
+          oninput="autoSaveNote()">
+        <button onclick="deleteCurrentNote()" title="Delete note"
+          style="background:transparent; border:1px solid #c0392b; color:#c0392b; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.8rem;">🗑</button>
+      </div>
+
+      <!-- TOOLBAR -->
+      <div style="padding:6px 18px; border-bottom:1px solid #0f3460; display:flex; gap:6px; flex-wrap:wrap; background:#16213e;">
+        <button class="tb-btn" onclick="insertMd('**','**')" title="Bold"><b>B</b></button>
+        <button class="tb-btn" onclick="insertMd('*','*')" title="Italic"><i>I</i></button>
+        <button class="tb-btn" onclick="insertMd('# ','')" title="Heading">H1</button>
+        <button class="tb-btn" onclick="insertMd('## ','')" title="Heading 2">H2</button>
+        <button class="tb-btn" onclick="insertMd('- ','')" title="Bullet">•</button>
+        <button class="tb-btn" onclick="insertMd('> ','')" title="Quote">❝</button>
+        <button class="tb-btn" onclick="insertMd('`','`')" title="Code">⌨</button>
+        <button class="tb-btn" onclick="insertMd('[[',']]')" title="Link to note">[[]]</button>
+        <span style="color:#0f3460;padding:0 4px;">|</span>
+        <button class="tb-btn tb-btn-active" id="modeBtn" onclick="togglePreview()">👁 Preview</button>
+        <span style="color:#0f3460;padding:0 4px;">|</span>
+        <button class="tb-btn" onclick="exportCurrentNote()" title="Export this note as .md">⬇ Export Note</button>
+      </div>
+
+      <div style="flex:1; display:flex; overflow:hidden;">
+        <textarea id="noteBody" placeholder="Start writing... Use [[Note Title]] to link to other notes or [[Character Name]] to link to characters."
+          style="flex:1; background:#1a1a2e; color:#e0d7c6; border:none; padding:20px 24px; font-size:0.92rem; font-family:Georgia,serif; line-height:1.8; resize:none; outline:none;"
+          oninput="autoSaveNote()"></textarea>
+        <div id="notePreview" style="flex:1; background:#1a1a2e; color:#e0d7c6; padding:20px 24px; font-size:0.92rem; font-family:Georgia,serif; line-height:1.8; overflow-y:auto; display:none; border-left:1px solid #0f3460;"></div>
+      </div>
+
+      <!-- BACKLINKS PANEL -->
+      <div id="noteBacklinksBar" style="padding:10px 18px; border-top:1px solid #0f3460; background:#16213e; font-size:0.8rem; color:#a89b8a; min-height:36px;">
+        <span style="color:#7ec8e3; font-size:0.72rem; text-transform:uppercase; letter-spacing:1px; margin-right:8px;">🔗 Linked from:</span>
+        <span id="noteBacklinksList">—</span>
+      </div>
+    </div>
+
+    <!-- GRAPH VIEW -->
+    <div id="graphView" style="flex:1; display:none; flex-direction:column; overflow:hidden;">
+      <div style="padding:12px 18px; border-bottom:1px solid #0f3460; display:flex; align-items:center; gap:10px; background:#1a1a2e;">
+        <span style="color:#e2b96f; font-size:1rem; font-weight:bold; font-family:Georgia,serif;">🕸 Graph View</span>
+        <button onclick="hideGraphView()" style="margin-left:auto; background:transparent; border:1px solid #0f3460; color:#a89b8a; padding:5px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem;">← Back to Editor</button>
+      </div>
+      <div id="graphCanvas" style="flex:1; background:#1a1a2e; position:relative; overflow:hidden;"></div>
+      <div style="padding:8px 18px; border-top:1px solid #0f3460; font-size:0.75rem; color:#a89b8a; background:#16213e;">
+        💡 Nodes = notes & characters · Edges = [[links]] · Click a node to open it · Drag to pan · Scroll to zoom
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+  .tb-btn {
+    background:#0f3460; color:#a89b8a; border:1px solid #0f3460; padding:4px 9px;
+    border-radius:5px; cursor:pointer; font-size:0.78rem; transition:all 0.15s;
+  }
+  .tb-btn:hover, .tb-btn-active { background:#e2b96f; color:#1a1a2e; border-color:#e2b96f; }
+  .note-item {
+    padding:9px 10px; border-radius:8px; cursor:pointer; margin-bottom:3px;
+    border:1px solid transparent; transition:all 0.15s;
+  }
+  .note-item:hover { background:#0f3460; border-color:#0f3460; }
+  .note-item.active { background:#1a3060; border-color:#e2b96f; }
+  .note-item-title { color:#e0d7c6; font-size:0.86rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .note-item-meta { color:#a89b8a; font-size:0.72rem; margin-top:2px; }
+  #notePreview h1 { color:#e2b96f; font-size:1.3rem; margin:0 0 12px; }
+  #notePreview h2 { color:#e2b96f; font-size:1.1rem; margin:16px 0 8px; }
+  #notePreview h3 { color:#c9a84c; font-size:0.95rem; margin:12px 0 6px; }
+  #notePreview p { margin-bottom:10px; }
+  #notePreview ul, #notePreview ol { padding-left:20px; margin-bottom:10px; }
+  #notePreview li { margin-bottom:4px; }
+  #notePreview code { background:#0f3460; padding:2px 6px; border-radius:4px; font-family:monospace; font-size:0.85em; }
+  #notePreview pre { background:#0f3460; padding:12px; border-radius:8px; overflow-x:auto; margin-bottom:10px; }
+  #notePreview blockquote { border-left:3px solid #e2b96f; padding-left:12px; color:#a89b8a; margin:10px 0; }
+  #notePreview strong { color:#e2b96f; }
+  #notePreview em { color:#7ec8e3; }
+  #notePreview .note-link { color:#7ec8e3; cursor:pointer; text-decoration:underline; }
+  #notePreview .note-link:hover { color:#e2b96f; }
+  #noteList::-webkit-scrollbar { width:4px; }
+  #noteList::-webkit-scrollbar-thumb { background:#0f3460; border-radius:4px; }
+</style>
+
+
+<!-- ===== EXPORT MODAL ===== -->
+<div id="exportModal" style="display:none; position:fixed; inset:0; background:#000000aa; z-index:999; align-items:center; justify-content:center;">
+  <div style="background:#16213e; border:1px solid #e2b96f; border-radius:18px; padding:28px; max-width:520px; width:90%; max-height:85vh; overflow-y:auto; position:relative;">
+    <button onclick="closeExportModal()" style="position:absolute;top:14px;right:16px;background:transparent;border:none;color:#a89b8a;font-size:1.3rem;cursor:pointer;">✕</button>
+    <h2 style="color:#e2b96f; margin-bottom:6px; font-size:1.1rem;">📦 Export to Obsidian / Markdown</h2>
+    <p style="color:#a89b8a; font-size:0.8rem; margin-bottom:18px;">Each file is a clean <code style="background:#0f3460;padding:2px 6px;border-radius:4px;">.md</code> file ready to drop into your Obsidian vault.</p>
+
+    <div style="display:flex; flex-direction:column; gap:10px;">
+
+      <div style="background:#1a1a2e; border:1px solid #0f3460; border-radius:12px; padding:16px;">
+        <div style="color:#e0d7c6; font-size:0.9rem; font-weight:bold; margin-bottom:6px;">📝 Notes</div>
+        <div style="color:#a89b8a; font-size:0.8rem; margin-bottom:12px;" id="exportNoteCount">Loading...</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button onclick="exportAllNotes()" style="flex:1; padding:9px; background:#e2b96f; color:#1a1a2e; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">⬇ Export All Notes</button>
+          <button onclick="exportNoteZip()" style="flex:1; padding:9px; background:#0f3460; color:#e2b96f; border:1px solid #e2b96f; border-radius:8px; cursor:pointer; font-size:0.85rem;">🗜 Download as ZIP</button>
+        </div>
+      </div>
+
+      <div style="background:#1a1a2e; border:1px solid #0f3460; border-radius:12px; padding:16px;">
+        <div style="color:#e0d7c6; font-size:0.9rem; font-weight:bold; margin-bottom:6px;">🏛️ Characters</div>
+        <div style="color:#a89b8a; font-size:0.8rem; margin-bottom:12px;" id="exportCharCount">Loading...</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button onclick="exportAllCharacters()" style="flex:1; padding:9px; background:#e2b96f; color:#1a1a2e; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">⬇ Export All Characters</button>
+          <button onclick="exportCharZip()" style="flex:1; padding:9px; background:#0f3460; color:#e2b96f; border:1px solid #e2b96f; border-radius:8px; cursor:pointer; font-size:0.85rem;">🗜 Download as ZIP</button>
+        </div>
+      </div>
+
+      <div style="background:#1a1a2e; border:1px solid #0f3460; border-radius:12px; padding:16px;">
+        <div style="color:#e0d7c6; font-size:0.9rem; font-weight:bold; margin-bottom:6px;">📚 Everything</div>
+        <div style="color:#a89b8a; font-size:0.8rem; margin-bottom:12px;">All notes + all characters in one ZIP vault</div>
+        <button onclick="exportFullVault()" style="width:100%; padding:9px; background:#e2b96f; color:#1a1a2e; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.88rem;">🏛️ Export Full Mythos Vault (.zip)</button>
+      </div>
+
+    </div>
+
+    <div style="margin-top:16px; background:#0f3460; border-radius:10px; padding:12px 14px; font-size:0.78rem; color:#a89b8a; line-height:1.6;">
+      💡 <b style="color:#e2b96f;">How to import into Obsidian:</b><br>
+      1. Unzip the downloaded file<br>
+      2. Move the folder into your Obsidian vault folder<br>
+      3. Open Obsidian → all notes appear with [[links]] intact ✅
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== TEMPLATE MANAGER MODAL ===== -->
+<div id="templateManagerModal" style="display:none; position:fixed; inset:0; background:#000000bb; z-index:1000; align-items:flex-start; justify-content:center; padding-top:40px; overflow-y:auto;">
+  <div style="background:#16213e; border:1px solid #e2b96f; border-radius:18px; padding:26px; max-width:680px; width:93%; position:relative; margin-bottom:40px;">
+    <button onclick="closeTemplateManager()" style="position:absolute;top:14px;right:16px;background:transparent;border:none;color:#a89b8a;font-size:1.3rem;cursor:pointer;">✕</button>
+    <h2 style="color:#e2b96f; margin-bottom:4px; font-size:1.05rem;">⚙️ Note Types & Templates</h2>
+    <p style="color:#a89b8a; font-size:0.78rem; margin-bottom:18px;">Each type has an emoji, name, category, tag, and a markdown template that auto-fills when selected.</p>
+
+    <!-- ADD NEW TYPE FORM -->
+    <div style="background:#1a1a2e; border:1px solid #0f3460; border-radius:12px; padding:16px; margin-bottom:16px;">
+      <div style="color:#e2b96f; font-size:0.82rem; font-weight:bold; margin-bottom:10px;">➕ Add New Type</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:8px;">
+        <input id="nt_emoji" placeholder="Emoji e.g. 🔴" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#16213e; color:#e0d7c6; font-size:0.85rem;">
+        <input id="nt_name" placeholder="Name e.g. Anger & Conflict" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#16213e; color:#e0d7c6; font-size:0.85rem;">
+        <input id="nt_category" placeholder="Category e.g. Human Nature" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#16213e; color:#e0d7c6; font-size:0.85rem;">
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+        <input id="nt_tag" placeholder="Tag e.g. theme/anger" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#16213e; color:#e0d7c6; font-size:0.85rem;">
+        <input id="nt_obsidian_link" placeholder="Obsidian link name (optional)" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#16213e; color:#e0d7c6; font-size:0.85rem;">
+      </div>
+      <textarea id="nt_template" placeholder="Markdown template — use {{title}}, {{tag}}, {{date}} as placeholders" style="width:100%; height:120px; padding:9px 12px; border-radius:8px; border:1px solid #0f3460; background:#16213e; color:#e0d7c6; font-size:0.82rem; font-family:monospace; resize:vertical;"></textarea>
+      <button onclick="addNoteType()" style="margin-top:8px; padding:9px 20px; background:#e2b96f; color:#1a1a2e; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">Save Type</button>
+    </div>
+
+    <!-- EXISTING TYPES LIST -->
+    <div id="noteTypeList" style="display:flex; flex-direction:column; gap:8px;"></div>
+  </div>
+</div>
+
+<!-- TEMPLATE EDIT MODAL -->
+<div id="templateEditModal" style="display:none; position:fixed; inset:0; background:#000000bb; z-index:1001; align-items:center; justify-content:center;">
+  <div style="background:#16213e; border:1px solid #e2b96f; border-radius:16px; padding:24px; max-width:540px; width:92%; position:relative;">
+    <button onclick="closeTemplateEdit()" style="position:absolute;top:12px;right:14px;background:transparent;border:none;color:#a89b8a;font-size:1.2rem;cursor:pointer;">✕</button>
+    <h3 style="color:#e2b96f; margin-bottom:14px; font-size:1rem;">✏️ Edit Note Type</h3>
+    <input type="hidden" id="edit_nt_id">
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; margin-bottom:7px;">
+      <input id="edit_nt_emoji" placeholder="Emoji" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.85rem;">
+      <input id="edit_nt_name" placeholder="Name" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.85rem;">
+      <input id="edit_nt_category" placeholder="Category" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.85rem;">
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:7px;">
+      <input id="edit_nt_tag" placeholder="Tag" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.85rem;">
+      <input id="edit_nt_obsidian_link" placeholder="Obsidian link name" style="padding:7px 10px; border-radius:7px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.85rem;">
+    </div>
+    <textarea id="edit_nt_template" style="width:100%; height:130px; padding:9px 12px; border-radius:8px; border:1px solid #0f3460; background:#1a1a2e; color:#e0d7c6; font-size:0.82rem; font-family:monospace; resize:vertical;"></textarea>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <button onclick="saveTemplateEdit()" style="flex:1; padding:9px; background:#e2b96f; color:#1a1a2e; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Save Changes</button>
+      <button onclick="closeTemplateEdit()" style="flex:1; padding:9px; background:transparent; color:#a89b8a; border:1px solid #a89b8a; border-radius:8px; cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
